@@ -221,20 +221,9 @@
       
       document.getElementById('instructions').addEventListener('click', () => {
         document.getElementById('instructions').classList.remove('visible');
-        // Request fullscreen and device orientation permission on mobile
+        // Request fullscreen on mobile
         document.documentElement.requestFullscreen?.();
         screen.orientation.lock?.('landscape');
-        
-        // Request device orientation permission for iOS
-        if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-          DeviceOrientationEvent.requestPermission()
-            .then(response => {
-              if (response === 'granted') {
-                window.addEventListener('deviceorientation', handleDeviceOrientation);
-              }
-            })
-            .catch(console.error);
-        }
       });
     }
   </script>

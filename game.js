@@ -870,25 +870,7 @@ class Game {
   }
 
   handleDeviceOrientation(event) {
-    if (!this.isMobile) return;
-    
-    // Beta is front-to-back tilt in degrees, ranging from -180 to 180
-    // Gamma is left-to-right tilt in degrees, ranging from -90 to 90
-    const beta = event.beta;  // X-axis rotation
-    const gamma = event.gamma; // Y-axis rotation
-    
-    if (beta !== null && gamma !== null) {
-      // Convert degrees to radians and apply to camera rotation
-      // Limit vertical rotation to prevent flipping
-      const newRotationX = THREE.MathUtils.degToRad(THREE.MathUtils.clamp(beta - 45, -45, 45));
-      this.camera.rotation.x = -newRotationX * 2;
-      
-      // Horizontal rotation
-      this.camera.rotation.y = THREE.MathUtils.degToRad(-gamma * 2);
-      
-      // Keep camera level by forcing rotation.z to 0
-      this.camera.rotation.z = 0;
-    }
+    return;
   }
 
   animate() {
