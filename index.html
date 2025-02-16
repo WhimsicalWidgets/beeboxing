@@ -1,0 +1,114 @@
+<html>
+<head>
+  <title>Beekeeper Simulator</title>
+  <style>
+    body { margin: 0; }
+    canvas { display: block; }
+    #hud {
+      position: fixed;
+      bottom: 20px;
+      left: 20px;
+      top: auto;
+      background: rgba(0,0,0,0.3);
+      padding: 10px;
+      border-radius: 5px;
+    }
+    #hud div {
+      margin: 5px 0;
+      font-size: 18px;
+    }
+    #controls {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      text-align: right;
+      background: rgba(0, 0, 0, 0.5);
+      padding: 15px;
+      border-radius: 8px;
+      color: white;
+      font-family: monospace;
+      font-size: 16px;
+    }
+    #instructions {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+      background: rgba(0, 0, 0, 0.7);
+      padding: 20px;
+      border-radius: 10px;
+      color: white;
+      font-family: Arial, sans-serif;
+      display: none;
+    }
+    #instructions.visible {
+      display: block;
+    }
+    .crosshair {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      width: 20px;
+      height: 20px;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+    }
+    .crosshair::before,
+    .crosshair::after {
+      content: "";
+      position: absolute;
+      background: white;
+      box-shadow: 0 0 4px black;
+    }
+    .crosshair::before {
+      width: 2px;
+      height: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+    .crosshair::after {
+      width: 20px;
+      height: 2px;
+      top: 50%;
+      transform: translateY(-50%);
+    }
+  </style>
+</head>
+<body>
+  <div id="hud">
+    <div>Position: <span id="position"></span></div>
+    <div>FPS: <span id="fps"></span></div>
+    <div id="score-bees">Boxing Bees: 0</div>
+    <div id="score-boxes">Bee Boxes: 0</div>
+  </div>
+  <div id="controls">
+    WASD - Move<br>
+    SPACE - Jump<br>
+    1 - Smoker Tool<br>
+    2 - Honey Pot Tool<br>
+    LEFT CLICK - Use Smoker<br>
+    RIGHT CLICK - Collect Honey<br>
+    ESC - Pause
+  </div>
+  <div id="instructions" class="visible">
+    <h2>Beekeeper Simulator</h2>
+    <p>Click to Start</p>
+    <p>Watch the bee boxes and respond when they need attention!</p>
+    <p>Red boxes need the smoker (1 + Left Click)</p>
+    <p>Golden boxes need honey collection (2 + Right Click)</p>
+  </div>
+  <div class="crosshair"></div>
+  <script type="module" src="game.js"></script>
+  <script>
+    document.addEventListener('pointerlockchange', () => {
+      const instructions = document.getElementById('instructions');
+      if (document.pointerLockElement) {
+        instructions.classList.remove('visible');
+      } else {
+        instructions.classList.add('visible');
+      }
+    });
+  </script>
+</body>
+</html>
