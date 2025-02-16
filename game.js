@@ -15,9 +15,9 @@ class Game {
     
     this.isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     if (this.isMobile) {
-      // Skip pointer lock for mobile
-      this.controls = new PointerLockControls(this.camera, document.body);
-      this.controls.isLocked = true; // Always consider locked on mobile
+      // Don't use PointerLockControls for mobile
+      this.controls = null;
+      this.camera.rotation.order = 'YXZ'; // Ensure proper rotation order
     } else {
       this.controls = new PointerLockControls(this.camera, document.body);
     }
@@ -65,6 +65,19 @@ class Game {
     };
     
     if (this.isMobile) {
+      // Request device orientation permission for iOS
+      if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+        DeviceOrientationEvent.requestPermission()
+          .then(response => {
+            if (response === 'granted') {
+              window.addEventListener('deviceorientation', (e) => this.handleDeviceOrientation(e));
+            }
+          })
+          .catch(console.error);
+      } else {
+        // For Android or devices that don't need permission
+        window.addEventListener('deviceorientation', (e) => this.handleDeviceOrientation(e));
+      }
       this.initMobileControls();
     }
 
@@ -153,7 +166,7 @@ class Game {
     this.cubeVelocities = new Map();
 
     // Create bee boxes
-    for (let i = 0; i < 20; i++) {
+    for (let i = 0; i < 30; i++) {
       this.createBeeBox(
         Math.random() * 160 - 80,
         0.5,
@@ -744,8 +757,9 @@ class Game {
           const deltaX = touch.clientX - lastTouchX;
           const deltaY = touch.clientY - lastTouchY;
           
-          if (this.controls.isLocked) {
-            // Doubled sensitivity for camera movement (0.002 instead of 0.001)
+          // Camera rotation with better handling
+          if (this.touchControls.looking) {
+            // Doubled sensitivity for camera movement
             this.camera.rotation.y -= deltaX * 0.002;
             // Clamp vertical rotation
             const newRotationX = this.camera.rotation.x - deltaY * 0.002;
@@ -772,6 +786,40 @@ class Game {
         this.moveLeft = false;
         this.moveRight = false;
       }
+    });
+
+    // Mouse/touch event handlers for mobile devices
+    document.addEventListener('mousedown', (e) => {
+      const element = document.elementFromPoint(e.clientX, e.clientY);
+      if (element === movementPad || element === movementStick || element.classList.contains('tool-button')) {
+        return;
+      }
+      
+      lastTouchX = e.clientX;
+      lastTouchY = e.clientY;
+      this.touchControls.looking = true;
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (this.touchControls.looking) {
+        const deltaX = e.clientX - lastTouchX;
+        const deltaY = e.clientY - lastTouchY;
+        
+        // Camera rotation with mouse
+        this.camera.rotation.y -= deltaX * 0.004;
+        const newRotationX = this.camera.rotation.x - deltaY * 0.004;
+        this.camera.rotation.x = Math.max(-Math.PI/3, Math.min(Math.PI/3, newRotationX));
+        
+        // Keep camera level
+        this.camera.rotation.z = 0;
+        
+        lastTouchX = e.clientX;
+        lastTouchY = e.clientY;
+      }
+    });
+
+    document.addEventListener('mouseup', () => {
+      this.touchControls.looking = false;
     });
 
     // Tool selection
@@ -812,18 +860,41 @@ class Game {
     
     // Reduce movement sensitivity to 1/4 for mobile
     this.touchControls.movement.x = (stickX / 40) * 0.25;
-    this.touchControls.movement.y = (stickY / 40) * 0.25;
+    this.touchControls.movement.y = -(stickY / 40) * 0.25; // Reversed Y movement
     
-    this.moveForward = stickY < -0.3;
-    this.moveBackward = stickY > 0.3;
+    // Reversed forward/backward controls
+    this.moveForward = stickY > 0.3;
+    this.moveBackward = stickY < -0.3;
     this.moveLeft = stickX < -0.3;
     this.moveRight = stickX > 0.3;
+  }
+
+  handleDeviceOrientation(event) {
+    if (!this.isMobile) return;
+    
+    // Beta is front-to-back tilt in degrees, ranging from -180 to 180
+    // Gamma is left-to-right tilt in degrees, ranging from -90 to 90
+    const beta = event.beta;  // X-axis rotation
+    const gamma = event.gamma; // Y-axis rotation
+    
+    if (beta !== null && gamma !== null) {
+      // Convert degrees to radians and apply to camera rotation
+      // Limit vertical rotation to prevent flipping
+      const newRotationX = THREE.MathUtils.degToRad(THREE.MathUtils.clamp(beta - 45, -45, 45));
+      this.camera.rotation.x = -newRotationX * 2;
+      
+      // Horizontal rotation
+      this.camera.rotation.y = THREE.MathUtils.degToRad(-gamma * 2);
+      
+      // Keep camera level by forcing rotation.z to 0
+      this.camera.rotation.z = 0;
+    }
   }
 
   animate() {
     requestAnimationFrame(() => this.animate());
 
-    const isActive = this.isMobile || this.controls.isLocked;
+    const isActive = this.isMobile || (this.controls && this.controls.isLocked);
     
     if (isActive) {
       const time = performance.now();
@@ -850,8 +921,17 @@ class Game {
         this.velocity.x -= this.direction.x * 400.0 * delta;
       }
 
-      this.controls.moveRight(-this.velocity.x * delta);
-      this.controls.moveForward(-this.velocity.z * delta);
+      if (this.isMobile) {
+        // For mobile, apply movement relative to camera rotation
+        const moveX = -this.velocity.x * delta;
+        const moveZ = -this.velocity.z * delta;
+        const angle = this.camera.rotation.y;
+        this.camera.position.x += Math.sin(angle) * moveZ + Math.cos(angle) * moveX;
+        this.camera.position.z += Math.cos(angle) * moveZ - Math.sin(angle) * moveX;
+      } else {
+        this.controls.moveRight(-this.velocity.x * delta);
+        this.controls.moveForward(-this.velocity.z * delta);
+      }
 
       this.camera.position.y += this.velocity.y * delta;
 

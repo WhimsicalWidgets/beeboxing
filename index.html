@@ -184,9 +184,7 @@
     WASD - Move<br>
     SPACE - Jump<br>
     1 - Smoker Tool<br>
-    2 - Honey Pot Tool<br>
     LEFT CLICK - Use Smoker<br>
-    RIGHT CLICK - Collect Honey<br>
     ESC - Pause
   </div>
   <div id="mobile-controls">
@@ -200,11 +198,8 @@
     <div class="tool-button" data-tool="2">2</div>
   </div>
   <div id="instructions" class="visible">
-    <h2>Beekeeper Simulator</h2>
+    <h2>Bee Boxing</h2>
     <p>Click to Start</p>
-    <p>Watch the bee boxes and respond when they need attention!</p>
-    <p>Red boxes need the smoker (1 + Left Click)</p>
-    <p>Golden boxes need honey collection (2 + Right Click)</p>
   </div>
   <div class="crosshair"></div>
   <script type="module" src="game.js"></script>
@@ -221,15 +216,25 @@
     // Detect mobile device
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     if (isMobile) {
-      // Update instructions for mobile
+      // Remove pointer lock related content
       document.querySelector('#instructions p').textContent = 'Tap to Start';
       
-      // Handle instruction click/tap for mobile
       document.getElementById('instructions').addEventListener('click', () => {
         document.getElementById('instructions').classList.remove('visible');
-        // Request fullscreen on mobile
+        // Request fullscreen and device orientation permission on mobile
         document.documentElement.requestFullscreen?.();
         screen.orientation.lock?.('landscape');
+        
+        // Request device orientation permission for iOS
+        if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+          DeviceOrientationEvent.requestPermission()
+            .then(response => {
+              if (response === 'granted') {
+                window.addEventListener('deviceorientation', handleDeviceOrientation);
+              }
+            })
+            .catch(console.error);
+        }
       });
     }
   </script>
