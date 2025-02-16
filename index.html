@@ -204,26 +204,30 @@
   <div class="crosshair"></div>
   <script type="module" src="game.js"></script>
   <script>
-    document.addEventListener('pointerlockchange', () => {
-      const instructions = document.getElementById('instructions');
-      if (document.pointerLockElement) {
-        instructions.classList.remove('visible');
-      } else if (!isMobile) {  
-        instructions.classList.add('visible');
+    // Improved mobile detection and fullscreen handling
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    
+    // Use touch events consistently for mobile
+    document.getElementById('instructions').addEventListener(isMobile ? 'touchstart' : 'click', () => {
+      document.getElementById('instructions').classList.remove('visible');
+      if (isMobile) {
+        // Handle mobile fullscreen more reliably
+        const elem = document.documentElement;
+        if (elem.requestFullscreen) elem.requestFullscreen();
+        else if (elem.webkitRequestFullscreen) elem.webkitRequestFullscreen();
+        
+        // Lock orientation if supported
+        if (screen.orientation?.lock) {
+          screen.orientation.lock('landscape').catch(() => {});
+        }
       }
     });
-    
-    // Detect mobile device
-    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    if (isMobile) {
-      // Remove pointer lock related content
-      document.querySelector('#instructions p').textContent = 'Tap to Start';
-      
-      document.getElementById('instructions').addEventListener('click', () => {
-        document.getElementById('instructions').classList.remove('visible');
-        // Request fullscreen on mobile
-        document.documentElement.requestFullscreen?.();
-        screen.orientation.lock?.('landscape');
+
+    // Remove pointerlock change listener for mobile
+    if (!isMobile) {
+      document.addEventListener('pointerlockchange', () => {
+        const instructions = document.getElementById('instructions');
+        instructions.classList.toggle('visible', !document.pointerLockElement);
       });
     }
   </script>

@@ -65,19 +65,6 @@ class Game {
     };
     
     if (this.isMobile) {
-      // Request device orientation permission for iOS
-      if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-        DeviceOrientationEvent.requestPermission()
-          .then(response => {
-            if (response === 'granted') {
-              window.addEventListener('deviceorientation', (e) => this.handleDeviceOrientation(e));
-            }
-          })
-          .catch(console.error);
-      } else {
-        // For Android or devices that don't need permission
-        window.addEventListener('deviceorientation', (e) => this.handleDeviceOrientation(e));
-      }
       this.initMobileControls();
     }
 
@@ -870,7 +857,7 @@ class Game {
   }
 
   handleDeviceOrientation(event) {
-    return;
+    // Empty implementation since we removed deviceorientation
   }
 
   animate() {
