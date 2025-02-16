@@ -13,7 +13,14 @@ class Game {
     // Set clear color to light blue to avoid white flash
     this.renderer.setClearColor(0x87CEEB);
     
-    this.controls = new PointerLockControls(this.camera, document.body);
+    this.isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    if (this.isMobile) {
+      // Skip pointer lock for mobile
+      this.controls = new PointerLockControls(this.camera, document.body);
+      this.controls.isLocked = true; // Always consider locked on mobile
+    } else {
+      this.controls = new PointerLockControls(this.camera, document.body);
+    }
     
     this.moveForward = false;
     this.moveBackward = false;
@@ -49,6 +56,17 @@ class Game {
     // Add score tracking
     this.boxingBeesRepelled = 0;
     this.beeBoxesSmoked = 0;
+
+    this.touchControls = {
+      movement: { x: 0, y: 0 },
+      look: { x: 0, y: 0 },
+      moving: false,
+      looking: false
+    };
+    
+    if (this.isMobile) {
+      this.initMobileControls();
+    }
 
     this.init();
   }
@@ -296,7 +314,7 @@ class Game {
   }
 
   onClick(event) {
-    if (!this.controls.isLocked) {
+    if (!this.isMobile && !this.controls.isLocked) {
       this.controls.lock();
       return;
     }
@@ -598,11 +616,15 @@ class Game {
   }
 
   updateBoxingBees(delta) {
-    // Spawn new bee every 1.5 seconds -> now 3 seconds
+    // Spawn new bee every 3 seconds
     if (performance.now() - this.lastBeeSpawn > 3000) {  
       this.spawnBoxingBee();
       this.lastBeeSpawn = performance.now();
     }
+
+    const playerRadius = 1; // Player collision radius
+    const beeRadius = 0.3; // Bee collision radius
+    const playerPos = this.camera.position.clone();
 
     // Update existing bees
     for (let i = this.boxingBees.length - 1; i >= 0; i--) {
@@ -620,9 +642,23 @@ class Game {
           this.boxingBees.splice(i, 1);
         }
       } else {
-        // Move towards player with reduced speed
+        // Calculate direction to player before moving
         const directionToPlayer = this.camera.position.clone().sub(bee.position).normalize();
-        bee.position.add(directionToPlayer.multiplyScalar(bee.userData.speed * delta));
+        const newPosition = bee.position.clone().add(directionToPlayer.multiplyScalar(bee.userData.speed * delta));
+        
+        // Check distance to player after potential movement
+        const distanceToPlayer = newPosition.distanceTo(playerPos);
+        
+        // Only move if not colliding with player
+        if (distanceToPlayer > (playerRadius + beeRadius)) {
+          bee.position.copy(newPosition);
+        } else {
+          // If would collide, stop at the collision point
+          const collisionPoint = bee.position.clone().add(
+            directionToPlayer.multiplyScalar(distanceToPlayer - (playerRadius + beeRadius))
+          );
+          bee.position.copy(collisionPoint);
+        }
         
         // Wobble motion
         bee.userData.wobble += delta * 5;
@@ -632,16 +668,164 @@ class Game {
         bee.children.forEach((glove, index) => {
           glove.rotation.z = Math.sin(bee.userData.wobble + (index * Math.PI)) * 0.5;
         });
+      }
 
-        // Removed the camera pushing behavior
+      // Check collisions with other bees
+      for (let j = i + 1; j < this.boxingBees.length; j++) {
+        const otherBee = this.boxingBees[j];
+        const distance = bee.position.distanceTo(otherBee.position);
+        
+        if (distance < beeRadius * 2) {
+          // Push bees apart
+          const pushDirection = bee.position.clone().sub(otherBee.position).normalize();
+          const pushAmount = (beeRadius * 2 - distance) / 2;
+          
+          bee.position.add(pushDirection.multiplyScalar(pushAmount));
+          otherBee.position.add(pushDirection.multiplyScalar(-pushAmount));
+        }
       }
     }
+  }
+
+  initMobileControls() {
+    const movementPad = document.getElementById('movement-pad');
+    const movementStick = document.getElementById('movement-stick');
+    const lookPad = document.getElementById('look-pad');
+    const toolButtons = document.getElementById('tool-buttons');
+
+    let lastTouchX = 0;
+    let lastTouchY = 0;
+
+    // Movement controls
+    movementPad.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      this.touchControls.moving = true;
+      this.updateMovementStick(e.touches[0], movementPad, movementStick);
+    });
+
+    // Camera look control for entire screen
+    document.addEventListener('touchstart', (e) => {
+      const element = document.elementFromPoint(e.touches[0].clientX, e.touches[0].clientY);
+      if (element === movementPad || element === movementStick || element.classList.contains('tool-button')) {
+        return;
+      }
+      
+      lastTouchX = e.touches[0].clientX;
+      lastTouchY = e.touches[0].clientY;
+      this.touchControls.looking = true;
+
+      // Check for interaction with bee boxes or bees
+      const touchX = (e.touches[0].clientX / window.innerWidth) * 2 - 1;
+      const touchY = -(e.touches[0].clientY / window.innerHeight) * 2 + 1;
+      this.raycaster.setFromCamera(new THREE.Vector2(touchX, touchY), this.camera);
+      
+      const intersectsBees = this.raycaster.intersectObjects(this.boxingBees);
+      const intersectsBoxes = this.raycaster.intersectObjects(this.beeBoxes);
+      
+      if (intersectsBees.length > 0 && this.tools.smoker.active) {
+        this.onClick(e);
+      } else if (intersectsBoxes.length > 0) {
+        if (this.tools.smoker.active) {
+          this.onClick(e);
+        } else if (this.tools.honeyPot.active) {
+          this.onRightClick(e);
+        }
+      }
+    });
+
+    document.addEventListener('touchmove', (e) => {
+      e.preventDefault();
+      for (let touch of e.touches) {
+        const element = document.elementFromPoint(touch.clientX, touch.clientY);
+        if (element === movementPad || element === movementStick) {
+          this.updateMovementStick(touch, movementPad, movementStick);
+        } else {
+          // Camera look control - modified for simpler rotation with doubled sensitivity
+          const deltaX = touch.clientX - lastTouchX;
+          const deltaY = touch.clientY - lastTouchY;
+          
+          if (this.controls.isLocked) {
+            // Doubled sensitivity for camera movement (0.002 instead of 0.001)
+            this.camera.rotation.y -= deltaX * 0.002;
+            // Clamp vertical rotation
+            const newRotationX = this.camera.rotation.x - deltaY * 0.002;
+            this.camera.rotation.x = Math.max(-Math.PI/3, Math.min(Math.PI/3, newRotationX));
+            
+            // Ensure camera stays level by forcing rotation.z to 0
+            this.camera.rotation.z = 0;
+          }
+          
+          lastTouchX = touch.clientX;
+          lastTouchY = touch.clientY;
+        }
+      }
+    });
+
+    document.addEventListener('touchend', (e) => {
+      if (e.touches.length === 0) {
+        this.touchControls.moving = false;
+        this.touchControls.looking = false;
+        movementStick.style.left = '40px';
+        movementStick.style.top = '40px';
+        this.moveForward = false;
+        this.moveBackward = false;
+        this.moveLeft = false;
+        this.moveRight = false;
+      }
+    });
+
+    // Tool selection
+    toolButtons.addEventListener('click', (e) => {
+      if (e.target.classList.contains('tool-button')) {
+        const tool = e.target.dataset.tool;
+        document.querySelectorAll('.tool-button').forEach(btn => {
+          btn.classList.remove('active-tool');
+        });
+        e.target.classList.add('active-tool');
+        if (tool === '1') {
+          this.tools.smoker.active = true;
+          this.tools.honeyPot.active = false;
+        } else if (tool === '2') {
+          this.tools.smoker.active = false;
+          this.tools.honeyPot.active = true;
+        }
+      }
+    });
+  }
+
+  updateMovementStick(touch, pad, stick) {
+    const padRect = pad.getBoundingClientRect();
+    const centerX = padRect.left + padRect.width / 2;
+    const centerY = padRect.top + padRect.height / 2;
+    
+    let deltaX = touch.clientX - centerX;
+    let deltaY = touch.clientY - centerY;
+    
+    const distance = Math.min(40, Math.sqrt(deltaX * deltaX + deltaY * deltaY));
+    const angle = Math.atan2(deltaY, deltaX);
+    
+    const stickX = Math.cos(angle) * distance;
+    const stickY = Math.sin(angle) * distance;
+    
+    stick.style.left = `${40 + stickX}px`;
+    stick.style.top = `${40 + stickY}px`;
+    
+    // Reduce movement sensitivity to 1/4 for mobile
+    this.touchControls.movement.x = (stickX / 40) * 0.25;
+    this.touchControls.movement.y = (stickY / 40) * 0.25;
+    
+    this.moveForward = stickY < -0.3;
+    this.moveBackward = stickY > 0.3;
+    this.moveLeft = stickX < -0.3;
+    this.moveRight = stickX > 0.3;
   }
 
   animate() {
     requestAnimationFrame(() => this.animate());
 
-    if (this.controls.isLocked) {
+    const isActive = this.isMobile || this.controls.isLocked;
+    
+    if (isActive) {
       const time = performance.now();
       let delta = (time - this.prevTime) / 1000;
       
@@ -697,6 +881,12 @@ class Game {
       this.prevTime = performance.now();
     }
 
+    if (isActive && this.isMobile) {
+      if (this.touchControls.looking) {
+        // Look controls are handled in updateLookControls
+      }
+    }
+    
     this.updateFPS();
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.updateParticleSystems(Math.min(this.lastDelta, 0.1));

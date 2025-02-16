@@ -1,8 +1,14 @@
 <html>
 <head>
   <title>Beekeeper Simulator</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <style>
-    body { margin: 0; }
+    body { 
+      margin: 0; 
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+    }
     canvas { display: block; }
     #hud {
       position: fixed;
@@ -12,10 +18,12 @@
       background: rgba(0,0,0,0.3);
       padding: 10px;
       border-radius: 5px;
+      color: white;
+      z-index: 10;
     }
     #hud div {
       margin: 5px 0;
-      font-size: 18px;
+      font-size: 16px;
     }
     #controls {
       position: fixed;
@@ -27,23 +35,82 @@
       border-radius: 8px;
       color: white;
       font-family: monospace;
-      font-size: 16px;
+      font-size: 14px;
+      z-index: 10;
     }
-    #instructions {
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      text-align: center;
-      background: rgba(0, 0, 0, 0.7);
-      padding: 20px;
-      border-radius: 10px;
-      color: white;
-      font-family: Arial, sans-serif;
+    #mobile-controls {
       display: none;
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
     }
-    #instructions.visible {
-      display: block;
+    #movement-pad {
+      position: fixed;
+      bottom: 20px;
+      left: 20px;
+      width: 120px;
+      height: 120px;
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 60px;
+      z-index: 10;
+    }
+    #movement-stick {
+      position: absolute;
+      width: 40px;
+      height: 40px;
+      background: rgba(255, 255, 255, 0.5);
+      border-radius: 20px;
+      top: 40px;
+      left: 40px;
+      touch-action: none;
+    }
+    .mobile-button {
+      width: 60px;
+      height: 60px;
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 30px;
+      margin: 0 10px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: bold;
+      touch-action: none;
+    }
+    #tool-buttons {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: none;
+      z-index: 10;
+    }
+    .tool-button {
+      width: 50px;
+      height: 50px;
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 25px;
+      margin: 0 10px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: bold;
+    }
+    .active-tool {
+      background: rgba(255, 255, 255, 0.5);
+    }
+    #look-pad {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      width: 120px;
+      height: 120px;
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 60px;
+      z-index: 10;
     }
     .crosshair {
       position: fixed;
@@ -73,6 +140,37 @@
       top: 50%;
       transform: translateY(-50%);
     }
+    #instructions {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+      background: rgba(0, 0, 0, 0.7);
+      padding: 20px;
+      border-radius: 10px;
+      color: white;
+      font-family: Arial, sans-serif;
+      display: none;
+    }
+    #instructions.visible {
+      display: block;
+    }
+    @media (max-width: 768px) {
+      #controls {
+        display: none;
+      }
+      #mobile-controls, #tool-buttons {
+        display: block;
+      }
+      #hud {
+        font-size: 14px;
+      }
+      .crosshair {
+        width: 16px;
+        height: 16px;
+      }
+    }
   </style>
 </head>
 <body>
@@ -91,6 +189,16 @@
     RIGHT CLICK - Collect Honey<br>
     ESC - Pause
   </div>
+  <div id="mobile-controls">
+    <div id="movement-pad">
+      <div id="movement-stick"></div>
+    </div>
+    <div id="look-pad"></div>
+  </div>
+  <div id="tool-buttons">
+    <div class="tool-button active-tool" data-tool="1">1</div>
+    <div class="tool-button" data-tool="2">2</div>
+  </div>
   <div id="instructions" class="visible">
     <h2>Beekeeper Simulator</h2>
     <p>Click to Start</p>
@@ -105,10 +213,25 @@
       const instructions = document.getElementById('instructions');
       if (document.pointerLockElement) {
         instructions.classList.remove('visible');
-      } else {
+      } else if (!isMobile) {  
         instructions.classList.add('visible');
       }
     });
+    
+    // Detect mobile device
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    if (isMobile) {
+      // Update instructions for mobile
+      document.querySelector('#instructions p').textContent = 'Tap to Start';
+      
+      // Handle instruction click/tap for mobile
+      document.getElementById('instructions').addEventListener('click', () => {
+        document.getElementById('instructions').classList.remove('visible');
+        // Request fullscreen on mobile
+        document.documentElement.requestFullscreen?.();
+        screen.orientation.lock?.('landscape');
+      });
+    }
   </script>
 </body>
 </html>
