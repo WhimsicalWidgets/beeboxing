@@ -688,6 +688,7 @@ class Game {
   }
 
   initMobileControls() {
+    console.log('[Debug] Initializing mobile controls');
     const movementPad = document.getElementById('movement-pad');
     const movementStick = document.getElementById('movement-stick');
     const lookPad = document.getElementById('look-pad');
@@ -698,6 +699,11 @@ class Game {
 
     // Movement controls
     movementPad.addEventListener('touchstart', (e) => {
+      console.log('[Debug] Movement pad touchstart', {
+        touches: e.touches.length,
+        x: e.touches[0].clientX,
+        y: e.touches[0].clientY
+      });
       e.preventDefault();
       this.touchControls.moving = true;
       this.updateMovementStick(e.touches[0], movementPad, movementStick);
@@ -705,8 +711,18 @@ class Game {
 
     // Camera look control for entire screen
     document.addEventListener('touchstart', (e) => {
+      console.log('[Debug] Document touchstart', {
+        touches: e.touches.length,
+        x: e.touches[0].clientX,
+        y: e.touches[0].clientY,
+        target: e.target.tagName
+      });
+      
       const element = document.elementFromPoint(e.touches[0].clientX, e.touches[0].clientY);
+      console.log('[Debug] Touch target element:', element.tagName, element.id);
+      
       if (element === movementPad || element === movementStick || element.classList.contains('tool-button')) {
+        console.log('[Debug] Touch ignored - control element');
         return;
       }
       
@@ -722,37 +738,43 @@ class Game {
       const intersectsBees = this.raycaster.intersectObjects(this.boxingBees);
       const intersectsBoxes = this.raycaster.intersectObjects(this.beeBoxes);
       
-      if (intersectsBees.length > 0 && this.tools.smoker.active) {
-        this.onClick(e);
-      } else if (intersectsBoxes.length > 0) {
-        if (this.tools.smoker.active) {
-          this.onClick(e);
-        } else if (this.tools.honeyPot.active) {
-          this.onRightClick(e);
-        }
-      }
+      console.log('[Debug] Interactions:', {
+        intersectsBees: intersectsBees.length,
+        intersectsBoxes: intersectsBoxes.length,
+        activeTool: this.tools.smoker.active ? 'smoker' : 'honeyPot'
+      });
     });
 
     document.addEventListener('touchmove', (e) => {
+      console.log('[Debug] Document touchmove', {
+        touches: e.touches.length,
+        moving: this.touchControls.moving,
+        looking: this.touchControls.looking
+      });
+      
       e.preventDefault();
       for (let touch of e.touches) {
         const element = document.elementFromPoint(touch.clientX, touch.clientY);
+        console.log('[Debug] Touch move target:', element.tagName, element.id);
+        
         if (element === movementPad || element === movementStick) {
           this.updateMovementStick(touch, movementPad, movementStick);
         } else {
-          // Camera look control - modified for simpler rotation with doubled sensitivity
           const deltaX = touch.clientX - lastTouchX;
           const deltaY = touch.clientY - lastTouchY;
           
-          // Camera rotation with better handling
+          console.log('[Debug] Camera movement:', {
+            deltaX,
+            deltaY,
+            currentRotationX: this.camera.rotation.x,
+            currentRotationY: this.camera.rotation.y
+          });
+          
           if (this.touchControls.looking) {
             // Doubled sensitivity for camera movement
             this.camera.rotation.y -= deltaX * 0.002;
-            // Clamp vertical rotation
             const newRotationX = this.camera.rotation.x - deltaY * 0.002;
             this.camera.rotation.x = Math.max(-Math.PI/3, Math.min(Math.PI/3, newRotationX));
-            
-            // Ensure camera stays level by forcing rotation.z to 0
             this.camera.rotation.z = 0;
           }
           
@@ -763,6 +785,12 @@ class Game {
     });
 
     document.addEventListener('touchend', (e) => {
+      console.log('[Debug] Document touchend', {
+        remainingTouches: e.touches.length,
+        moving: this.touchControls.moving,
+        looking: this.touchControls.looking
+      });
+      
       if (e.touches.length === 0) {
         this.touchControls.moving = false;
         this.touchControls.looking = false;
@@ -775,8 +803,14 @@ class Game {
       }
     });
 
-    // Mouse/touch event handlers for mobile devices
+    // Mouse event handlers
     document.addEventListener('mousedown', (e) => {
+      console.log('[Debug] Document mousedown', {
+        x: e.clientX,
+        y: e.clientY,
+        button: e.button
+      });
+      
       const element = document.elementFromPoint(e.clientX, e.clientY);
       if (element === movementPad || element === movementStick || element.classList.contains('tool-button')) {
         return;
@@ -789,15 +823,19 @@ class Game {
 
     document.addEventListener('mousemove', (e) => {
       if (this.touchControls.looking) {
+        console.log('[Debug] Mouse look movement', {
+          deltaX: e.clientX - lastTouchX,
+          deltaY: e.clientY - lastTouchY,
+          currentRotationX: this.camera.rotation.x,
+          currentRotationY: this.camera.rotation.y
+        });
+        
         const deltaX = e.clientX - lastTouchX;
         const deltaY = e.clientY - lastTouchY;
         
-        // Camera rotation with mouse
         this.camera.rotation.y -= deltaX * 0.004;
         const newRotationX = this.camera.rotation.x - deltaY * 0.004;
         this.camera.rotation.x = Math.max(-Math.PI/3, Math.min(Math.PI/3, newRotationX));
-        
-        // Keep camera level
         this.camera.rotation.z = 0;
         
         lastTouchX = e.clientX;
@@ -806,12 +844,14 @@ class Game {
     });
 
     document.addEventListener('mouseup', () => {
+      console.log('[Debug] Document mouseup');
       this.touchControls.looking = false;
     });
 
     // Tool selection
     toolButtons.addEventListener('click', (e) => {
       if (e.target.classList.contains('tool-button')) {
+        console.log('[Debug] Tool button clicked:', e.target.dataset.tool);
         const tool = e.target.dataset.tool;
         document.querySelectorAll('.tool-button').forEach(btn => {
           btn.classList.remove('active-tool');
@@ -826,6 +866,8 @@ class Game {
         }
       }
     });
+
+    console.log('[Debug] Mobile controls initialized');
   }
 
   updateMovementStick(touch, pad, stick) {
@@ -842,18 +884,32 @@ class Game {
     const stickX = Math.cos(angle) * distance;
     const stickY = Math.sin(angle) * distance;
     
+    console.log('[Debug] Movement stick update:', {
+      deltaX,
+      deltaY,
+      distance,
+      angle,
+      stickX,
+      stickY
+    });
+    
     stick.style.left = `${40 + stickX}px`;
     stick.style.top = `${40 + stickY}px`;
     
-    // Reduce movement sensitivity to 1/4 for mobile
     this.touchControls.movement.x = (stickX / 40) * 0.25;
-    this.touchControls.movement.y = -(stickY / 40) * 0.25; // Reversed Y movement
+    this.touchControls.movement.y = -(stickY / 40) * 0.25;
     
-    // Reversed forward/backward controls
     this.moveForward = stickY > 0.3;
     this.moveBackward = stickY < -0.3;
     this.moveLeft = stickX < -0.3;
     this.moveRight = stickX > 0.3;
+    
+    console.log('[Debug] Movement controls:', {
+      forward: this.moveForward,
+      backward: this.moveBackward,
+      left: this.moveLeft,
+      right: this.moveRight
+    });
   }
 
   handleDeviceOrientation(event) {
